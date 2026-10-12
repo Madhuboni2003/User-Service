@@ -1,9 +1,12 @@
 import logger from '../configs/logger.config';
-import { notificationConfig } from '../configs/server.config';
+import { leadNurtureSchedulerConfig, notificationConfig } from '../configs/server.config';
+import { firstEnabledStepFrom } from '../constants/leadNurtureSteps';
 import { enqueueLeadNurture } from '../producers/leadNurture.producer';
+import LeadNurtureRepository from '../repository/leadNurture.repository';
 import { LeadNurturePayload, WorkrSignupInput } from '../types/LeadNurturePayload';
 import { NotificationChannel } from '../utils/enums/NotificationChannel.enum';
 import { buildReadinessLink, isWorkingProfessional, toE164Phone } from '../utils/helpers/leadNurture.helper';
+import { dueAtForDay } from '../utils/helpers/leadNurtureSchedule.helper';
 
 // Product company readiness check: email + WhatsApp sent after a Working Professional signs up on WorkR.
 const READINESS_CHECK_STEP = 'PRODUCT_COMPANY_READINESS';
@@ -14,6 +17,8 @@ const READINESS_CHECK_TEMPLATE_KEYS: Record<NotificationChannel, string> = {
 };
 
 class LeadNurtureService {
+    private readonly leadNurtureRepository = new LeadNurtureRepository();
+
     /**
      * Called after a WorkR signup has been committed. Enqueues the product company readiness check email + WhatsApp only for
      * Working Professionals. Never throws.
@@ -52,9 +57,32 @@ class LeadNurtureService {
             };
 
             await enqueueLeadNurture(payload, `workr-readiness-check-${input.userId}`);
+            await this.scheduleNurture(input.userId, input.signedUpAt ?? new Date());
         } catch (error) {
             logger.error('Lead nurture handling failed', {
                 userId: input.userId,
+                message: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    /**
+     * Puts the user into the Day 2..Day 15 nurture: one row saying the first step is due at 11:00 IST two days after signup.
+     * The scheduler (crons/leadNurture.scheduler.ts) does the rest. Never throws; a failure here must not affect the Day 0 message.
+     */
+    private async scheduleNurture(userId: number, signedUpAt: Date): Promise<void> {
+        try {
+            const firstStep = firstEnabledStepFrom(0);
+            if (!firstStep) {
+                return;
+            }
+
+            const dueAt = dueAtForDay(signedUpAt, firstStep.day, leadNurtureSchedulerConfig.SEND_HOUR_IST);
+            const created = await this.leadNurtureRepository.createForSignup(userId, signedUpAt, firstStep.day, dueAt);
+            logger.info('Lead nurture scheduled', { userId, firstStep: firstStep.day, created });
+        } catch (error) {
+            logger.error('Lead nurture could not be scheduled', {
+                userId,
                 message: error instanceof Error ? error.message : String(error)
             });
         }

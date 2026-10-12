@@ -5,6 +5,7 @@ import express from 'express';
 
 import logger from './configs/logger.config';
 import { frontendConfig, serverConfig } from './configs/server.config';
+import { startLeadNurtureScheduler } from './crons/leadNurture.scheduler';
 import sequelize from './db/models/sequelize';
 import { attachCorrelationIdMiddleware } from './middlewares/correlation.middleware';
 import { appErrorHandler, genericErrorHandler } from './middlewares/error.middleware';
@@ -36,4 +37,7 @@ app.listen(serverConfig.PORT, async () => {
     logger.info(`Server is running on http://localhost:${serverConfig.PORT}`);
     await sequelize.authenticate();
     logger.info('Database connection has been established successfully');
+
+    // Day 2..Day 15 WorkR nurture; does nothing unless LEAD_NURTURE_SCHEDULER_ENABLED=true
+    startLeadNurtureScheduler();
 });

@@ -68,6 +68,24 @@ type NotificationConfig = {
     ENQUEUE_TIMEOUT_MS: number
 }
 
+type LeadNurtureSchedulerConfig = {
+    ENABLED: boolean
+    DRY_RUN: boolean
+    TICK_MINUTES: number
+    BATCH_SIZE: number
+    LOCK_MS: number
+    WINDOW_START_HOUR_IST: number
+    WINDOW_END_HOUR_IST: number
+    SEND_HOUR_IST: number
+}
+
+type VslEngagementConfig = {
+    BASE_URL: string
+    API_KEY: string
+    API_KEY_HEADER: string
+    TIMEOUT_MS: number
+}
+
 export const redisConfig: RedisConfig = {
     REDIS_HOST: process.env.REDIS_HOST || 'localhost',
     REDIS_PORT: Number(process.env.REDIS_PORT) || 6379,
@@ -84,4 +102,31 @@ export const notificationConfig: NotificationConfig = {
     READINESS_LINK_BASE_URL: process.env.READINESS_LINK_BASE_URL || 'https://ai-proof-engineering-readiness-chec.vercel.app/',
     // How long the background enqueue may wait for Redis before it is logged as failed (signup never waits for it).
     ENQUEUE_TIMEOUT_MS: Number(process.env.ENQUEUE_TIMEOUT_MS) || 5000
+};
+
+
+// The Day 2..Day 15 nurture runner. Off unless explicitly enabled, and when enabled it only logs what it would send until
+// LEAD_NURTURE_DRY_RUN is set to exactly "false".
+export const leadNurtureSchedulerConfig: LeadNurtureSchedulerConfig = {
+    ENABLED: process.env.LEAD_NURTURE_SCHEDULER_ENABLED === 'true',
+    DRY_RUN: process.env.LEAD_NURTURE_DRY_RUN !== 'false',
+    // How often a tick runs, on the clock (15 = :00, :15, :30, :45). Must divide 60.
+    TICK_MINUTES: Number(process.env.LEAD_NURTURE_TICK_MINUTES) || 15,
+    // Kept at or below the VSL lookup limit (200 contacts per call).
+    BATCH_SIZE: Math.min(Number(process.env.LEAD_NURTURE_BATCH_SIZE) || 100, 200),
+    // A claimed row that is never released (crash) becomes claimable again after this long.
+    LOCK_MS: Number(process.env.LEAD_NURTURE_LOCK_MS) || 10 * 60 * 1000,
+    // Messages go out between these hours IST, and each day's message is due at SEND_HOUR_IST.
+    WINDOW_START_HOUR_IST: Number(process.env.LEAD_NURTURE_WINDOW_START_HOUR_IST) || 10,
+    WINDOW_END_HOUR_IST: Number(process.env.LEAD_NURTURE_WINDOW_END_HOUR_IST) || 19,
+    SEND_HOUR_IST: Number(process.env.LEAD_NURTURE_SEND_HOUR_IST) || 11
+};
+
+// The VSL's candidate-form-details-service: asked which WorkR users have already registered there (POST /integrations/workr/engagement).
+export const vslEngagementConfig: VslEngagementConfig = {
+    // e.g. https://<form api domain>/api/v1 . Empty means "cannot ask", so nothing is ever sent.
+    BASE_URL: (process.env.VSL_API_BASE_URL || '').replace(/\/+$/, ''),
+    API_KEY: process.env.VSL_WORKR_API_KEY || '',
+    API_KEY_HEADER: process.env.VSL_WORKR_API_KEY_HEADER || 'x-workr-api-key',
+    TIMEOUT_MS: Number(process.env.VSL_API_TIMEOUT_MS) || 8000
 };

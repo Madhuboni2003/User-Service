@@ -8,6 +8,8 @@ import { NotificationChannel } from '../utils/enums/NotificationChannel.enum';
 export type LeadNurturePayload = {
     /** WorkR user id (the consumer derives its idempotency key from it) */
     userId: number
+    /** Which message this is: 0 / absent = the signup (Day 0) message, otherwise the nurture day (2, 4, 7, ...). Part of the consumer's idempotency key. */
+    step?: number
     candidateName: string
     candidateEmail: string
     /** E.164 (+91XXXXXXXXXX); empty string when the number is not a valid 10-digit Indian mobile */
@@ -15,8 +17,8 @@ export type LeadNurturePayload = {
     readinessLink: string
     subject: string
     channels: NotificationChannel[]
-    /** Template per channel. Keys follow the handbook naming: EMAIL_IC_[STAGE]_[NUMBER]_[PURPOSE] / WA_IC_... */
-    templateKeys: Record<NotificationChannel, string>
+    /** Template per requested channel (a channel that is not requested needs none) */
+    templateKeys: Partial<Record<NotificationChannel, string>>
     details: string
     domain: string | null
     graduationYear: string | null
