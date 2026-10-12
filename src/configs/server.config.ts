@@ -86,6 +86,13 @@ type VslEngagementConfig = {
     TIMEOUT_MS: number
 }
 
+type NotificationLookupConfig = {
+    BASE_URL: string
+    API_KEY: string
+    API_KEY_HEADER: string
+    TIMEOUT_MS: number
+}
+
 export const redisConfig: RedisConfig = {
     REDIS_HOST: process.env.REDIS_HOST || 'localhost',
     REDIS_PORT: Number(process.env.REDIS_PORT) || 6379,
@@ -129,4 +136,14 @@ export const vslEngagementConfig: VslEngagementConfig = {
     API_KEY: process.env.VSL_WORKR_API_KEY || '',
     API_KEY_HEADER: process.env.VSL_WORKR_API_KEY_HEADER || 'x-workr-api-key',
     TIMEOUT_MS: Number(process.env.VSL_API_TIMEOUT_MS) || 8000
+};
+
+// The notification-service: asked what became of the messages it was handed (POST /internal/workr/deliveries), for the admin list.
+// Optional: when unset or unreachable the admin list still loads and simply shows no delivery results.
+export const notificationLookupConfig: NotificationLookupConfig = {
+    // e.g. http://localhost:3005/api/v1 . Empty means "do not ask".
+    BASE_URL: (process.env.NOTIFICATION_SERVICE_BASE_URL || '').replace(/\/+$/, ''),
+    API_KEY: process.env.NOTIFICATION_LOOKUP_API_KEY || '',
+    API_KEY_HEADER: process.env.NOTIFICATION_LOOKUP_API_KEY_HEADER || 'x-workr-lookup-key',
+    TIMEOUT_MS: Number(process.env.NOTIFICATION_LOOKUP_TIMEOUT_MS) || 4000
 };

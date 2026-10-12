@@ -1,18 +1,23 @@
 import { json2csv } from 'json-2-csv';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 
+import { fetchWorkrDeliveries, isDeliveryLookupConfigured, NOTIFICATION_LOOKUP_MAX_USER_IDS } from '../apis/notificationDeliveries.api';
 import logger from '../configs/logger.config';
 import sequelize from '../db/models/sequelize';
 import User from '../db/models/user.model';
 import { FindUserByNameDto, LoginUserDto, RegisterUserDto } from '../dtos/user.dto';
 import { UpdateUserDto } from '../dtos/userProfile.dto';
+import LeadNurtureRepository from '../repository/leadNurture.repository';
 import RoleRepository from '../repository/role.repository';
 import UserRepository from '../repository/user.repository';
 import UserProfileRepository from '../repository/userProfile.repository';
 import UserRoleRepository from '../repository/userRole.repository';
+import { NurtureView } from '../types/LeadNurtureView';
+import { WorkrDelivery } from '../types/WorkrDelivery';
 import { checkPassword, createToken, verifyToken } from '../utils/auth/auth';
 import { BadRequestError, InternalServerError, NotFoundError, UnauthorizedError } from '../utils/errors/app.error';
 import { formatter } from '../utils/helpers/date.helper';
+import { attachDeliveries, buildNurtureView } from '../utils/helpers/leadNurtureView.helper';
 import leadNurtureService from './leadNurture.service';
 
 
@@ -21,6 +26,7 @@ class UserService {
     private userProfileRepository : UserProfileRepository;
     private roleRepository: RoleRepository;
     private userRoleRepository: UserRoleRepository;
+    private leadNurtureRepository = new LeadNurtureRepository();
 
     constructor(userRepository: UserRepository, userProfileRepository: UserProfileRepository, roleRepository: RoleRepository, userRoleRepository: UserRoleRepository) {
         this.userRepository = userRepository;
@@ -126,7 +132,7 @@ class UserService {
         const totalPages = Math.ceil(totalCount / limit);
 
         return {
-            records: records,
+            records: await this.withNurtureStatus(records),
             pagination: {
                 totalCount,
                 totalPages,
@@ -134,6 +140,70 @@ class UserService {
                 limit,
             },
         };
+    }
+
+    /**
+     * Adds each person's nurture status to the admin list. If the nurture rows cannot be read, `nurture` is null for everyone
+     * (the list still loads, and the screen says the status is unavailable instead of claiming nobody is in the sequence).
+     */
+    private async withNurtureStatus(users: User[]) {
+        let rowsByUser: Map<number, Awaited<ReturnType<LeadNurtureRepository['findByUserIds']>>[number]> | null = null;
+
+        try {
+            const rows = await this.leadNurtureRepository.findByUserIds(users.map((user) => user.id));
+            rowsByUser = new Map(rows.map((row) => [Number(row.userId), row]));
+        } catch (error) {
+            logger.error('Could not load the nurture status for the candidates list', {
+                message: error instanceof Error ? error.message : String(error)
+            });
+        }
+
+        const views = new Map<number, NurtureView>();
+        if (rowsByUser) {
+            for (const user of users) {
+                views.set(user.id, buildNurtureView(rowsByUser.get(user.id) ?? null, user.phoneNo));
+            }
+        }
+
+        const deliveriesByUser = await this.loadDeliveries([...views].filter(([, view]) => view.inSequence).map(([userId]) => userId));
+
+        return users.map((user) => {
+            const view = views.get(user.id) ?? null;
+            const deliveries = deliveriesByUser?.get(user.id);
+
+            return {
+                ...user.toJSON(),
+                nurture: view && deliveries ? attachDeliveries(view, deliveries) : view
+            };
+        });
+    }
+
+    /**
+     * What the notification-service says became of each person's messages, keyed by user id. null when it could not be asked
+     * (not configured, down, timed out): the list still loads and the screen then shows the delivery results as unknown.
+     */
+    private async loadDeliveries(userIds: number[]): Promise<Map<number, WorkrDelivery[]> | null> {
+        if (userIds.length === 0 || !isDeliveryLookupConfigured()) {
+            return null;
+        }
+
+        try {
+            const byUser = new Map<number, WorkrDelivery[]>(userIds.map((userId) => [userId, []]));
+
+            for (let start = 0; start < userIds.length; start += NOTIFICATION_LOOKUP_MAX_USER_IDS) {
+                const chunk = userIds.slice(start, start + NOTIFICATION_LOOKUP_MAX_USER_IDS);
+                for (const delivery of await fetchWorkrDeliveries(chunk)) {
+                    byUser.get(delivery.userId)?.push(delivery);
+                }
+            }
+
+            return byUser;
+        } catch (error) {
+            logger.error('Could not load the delivery results for the candidates list', {
+                message: error instanceof Error ? error.message : String(error)
+            });
+            return null;
+        }
     }
 
     async findByIdService(id: number) {

@@ -52,6 +52,17 @@ class LeadNurtureRepository extends BaseRepository<LeadNurture> implements LeadN
         }));
     }
 
+    /** The nurture rows of the given users (a user without a row is simply absent). */
+    async findByUserIds(userIds: number[]): Promise<LeadNurture[]> {
+        if (userIds.length === 0) {
+            return [];
+        }
+        return this.model.findAll({
+            where: { userId: userIds },
+            attributes: ['userId', 'status', 'stopReason', 'nextStep', 'nextDueAt', 'lastSentStep', 'lastSentAt']
+        });
+    }
+
     async findUsers(userIds: number[]): Promise<NurtureUser[]> {
         if (userIds.length === 0) {
             return [];
