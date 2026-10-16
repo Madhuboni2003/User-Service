@@ -100,13 +100,15 @@ class UserRepository extends BaseRepository<User> {
         return user;
     }
 
-    async findAllCandidates({limit, offset, details}:{limit: number, offset: number, details: string}){
+    async findAllCandidates({limit, offset, details, range}:{limit: number, offset: number, details: string, range?: {from: Date, to: Date}}){
         const users = await this.model.findAndCountAll({
             attributes: ['fullName','email', 'phoneNo', 'id', 'graduationYear', 'created_at'],
             where: {
                 deletedAt: {
                     [Op.eq]: null
-                }
+                },
+                // Optional: only people who signed up inside [from, to)
+                ...(range ? { createdAt: { [Op.gte]: range.from, [Op.lt]: range.to } } : {})
             },
             include: [
                 {
@@ -130,13 +132,14 @@ class UserRepository extends BaseRepository<User> {
         return users ;
     }
 
-    async findAllCandidatesForCSV(details: string): Promise<User[]>{
+    async findAllCandidatesForCSV(details: string, range?: {from: Date, to: Date}): Promise<User[]>{
         const candidates = await this.model.findAll({
             attributes: ['fullName','email', 'phoneNo', 'graduationYear', 'createdAt'],
             where: {
                 deletedAt: {
                     [Op.eq]: null
-                }
+                },
+                ...(range ? { createdAt: { [Op.gte]: range.from, [Op.lt]: range.to } } : {})
             },
             include: [
                 {
@@ -158,6 +161,42 @@ class UserRepository extends BaseRepository<User> {
         });
 
         return candidates;
+    }
+
+    /**
+     * Sign-up time and type of every job seeker (Student / Working Professional, the same people the candidates lists show)
+     * who joined at or after `since`. The service buckets them into IST days.
+     */
+    async findJobseekerSignupsSince(since: Date): Promise<{ createdAt: Date, details: string }[]>{
+        const users = await this.model.findAll({
+            attributes: ['id', 'createdAt'],
+            where: {
+                deletedAt: {
+                    [Op.eq]: null
+                },
+                createdAt: {
+                    [Op.gte]: since
+                }
+            },
+            include: [
+                {
+                    association: this.model.associations.roles,
+                    where: {
+                        name: 'jobseeker'
+                    },
+                    attributes: []
+                },
+                {
+                    association: this.model.associations.profile,
+                    where: {
+                        details: { [Op.in]: ['Student', 'Working Professional'] }
+                    },
+                    attributes: ['details']
+                }
+            ],
+        });
+
+        return users.map((user) => ({ createdAt: user.createdAt, details: String(user.profile?.details) }));
     }
 
     async getUserRolesById(userId: number){

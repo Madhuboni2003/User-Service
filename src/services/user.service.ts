@@ -17,6 +17,7 @@ import { WorkrDelivery } from '../types/WorkrDelivery';
 import { checkPassword, createToken, verifyToken } from '../utils/auth/auth';
 import { BadRequestError, InternalServerError, NotFoundError, UnauthorizedError } from '../utils/errors/app.error';
 import { formatter } from '../utils/helpers/date.helper';
+import { istDayKey, istDayRange, lastDayKeys } from '../utils/helpers/istDay.helper';
 import { attachDeliveries, buildNurtureView } from '../utils/helpers/leadNurtureView.helper';
 import leadNurtureService from './leadNurture.service';
 
@@ -111,7 +112,7 @@ class UserService {
         return jwtToken;
     }
 
-    async findAllCandidatesService({userId, page, limit, details}:{userId: number, page: number, limit: number, details: string}) {
+    async findAllCandidatesService({userId, page, limit, details, date}:{userId: number, page: number, limit: number, details: string, date?: string}) {
         const userRoles = await this.userRepository.getUserRolesById(userId);
     
         const roleNames = userRoles.roles?.map((role) => role.name);
@@ -128,7 +129,7 @@ class UserService {
         const offset = (page - 1) * limit;
 
 
-        const { rows: records, count: totalCount } = await this.userRepository.findAllCandidates({limit, offset, details});
+        const { rows: records, count: totalCount } = await this.userRepository.findAllCandidates({limit, offset, details, range: date ? istDayRange(date) : undefined});
         const totalPages = Math.ceil(totalCount / limit);
 
         return {
@@ -226,7 +227,7 @@ class UserService {
         return await this.userRepository.softDelete(id);
     }
 
-    async getAllCandidatesForCSVService({ userId, details }: { userId: number, details: string }) {
+    async getAllCandidatesForCSVService({ userId, details, date }: { userId: number, details: string, date?: string }) {
         const userRoles = await this.userRepository.getUserRolesById(userId);
 
         const roleNames = userRoles.roles?.map(r => r.name);
@@ -239,7 +240,7 @@ class UserService {
             throw new UnauthorizedError('Not an admin');
         }
 
-        const candidates: User[] = await this.userRepository.findAllCandidatesForCSV(details);
+        const candidates: User[] = await this.userRepository.findAllCandidatesForCSV(details, date ? istDayRange(date) : undefined);
 
         const plainCandidates = candidates.map((candidate) => ({
             ...candidate.toJSON(),
@@ -257,6 +258,47 @@ class UserService {
         return csv;
     }
 
+
+    /**
+     * Admin only. How many job seekers signed up on each of the last `days` Indian calendar days (today first),
+     * split into students and working professionals. Days with no sign-ups are included with zeros.
+     */
+    async getSignupsByDayService({ userId, days }: { userId: number, days: number }) {
+        const userRoles = await this.userRepository.getUserRolesById(userId);
+
+        const roleNames = userRoles.roles?.map(r => r.name);
+        if (!roleNames) {
+            logger.error('No roles found');
+            throw new NotFoundError('No roles found');
+        }
+        if (!roleNames.includes('admin')) {
+            logger.error('Not an admin');
+            throw new UnauthorizedError('Not an admin');
+        }
+
+        const dayKeys = lastDayKeys(days);
+        const since = istDayRange(dayKeys[dayKeys.length - 1]).from;
+        const signups = await this.userRepository.findJobseekerSignupsSince(since);
+
+        const buckets = new Map(dayKeys.map((key) => [key, { date: key, total: 0, students: 0, workingProfessionals: 0 }]));
+        for (const signup of signups) {
+            const bucket = buckets.get(istDayKey(signup.createdAt));
+            if (!bucket) {
+                continue;
+            }
+            bucket.total += 1;
+            if (signup.details === 'Student') {
+                bucket.students += 1;
+            } else {
+                bucket.workingProfessionals += 1;
+            }
+        }
+
+        return {
+            timezone: 'Asia/Kolkata',
+            days: dayKeys.map((key) => buckets.get(key)!),
+        };
+    }
 
     isAuthenticated(authToken: string){
         try {

@@ -8,6 +8,8 @@ import UserRoleRepository from '../repository/userRole.repository';
 import UserService from '../services/user.service';
 import UserProfileService from '../services/userProfile.service';
 import { AuthRequest } from '../types/AuthRequest';
+import { BadRequestError } from '../utils/errors/app.error';
+import { isValidDayKey } from '../utils/helpers/istDay.helper';
 
 const userRepository = new UserRepository();
 const userProfileRepository = new UserProfileRepository();
@@ -156,6 +158,17 @@ async function getUserDetailsById(req: AuthRequest, res: Response, next: NextFun
     }
 }
 
+/** Optional ?date=YYYY-MM-DD (an Indian calendar day). Missing or empty means "all time". */
+function parseDateQuery(value: unknown): string | undefined {
+    if (value === undefined || value === '') {
+        return undefined;
+    }
+    if (!isValidDayKey(value)) {
+        throw new BadRequestError('date must be a valid day written as YYYY-MM-DD');
+    }
+    return value;
+}
+
 async function getAllUsers(req: AuthRequest, res: Response, next: NextFunction){
     try {
         const id = Number(req.user?.id);
@@ -163,7 +176,9 @@ async function getAllUsers(req: AuthRequest, res: Response, next: NextFunction){
         const page = Number(req.query.page) || 1;
         const limit = Number(req.query.limit) || 10;
 
-        const response = await userService.findAllCandidatesService({userId: id, page, limit, details});
+        const date = parseDateQuery(req.query.date);
+
+        const response = await userService.findAllCandidatesService({userId: id, page, limit, details, date});
         res.status(StatusCodes.OK).json({
             success: true,
             message: 'Users fetched successfully',
@@ -179,7 +194,8 @@ async function getAllCandidatesCSV(req: AuthRequest, res: Response, next: NextFu
     try {
         const userId = Number( req.user?.id );
         const details = String( req.query.details );
-        const stringCSV = await userService.getAllCandidatesForCSVService({userId, details});
+        const date = parseDateQuery(req.query.date);
+        const stringCSV = await userService.getAllCandidatesForCSVService({userId, details, date});
         res.setHeader('Content-Type', 'text/csv')
             .setHeader('Content-Disposition', 'attachment; filename="candidates.csv"')
             .status(StatusCodes.OK)
@@ -189,7 +205,28 @@ async function getAllCandidatesCSV(req: AuthRequest, res: Response, next: NextFu
     }
 }
 
+async function getSignupsByDay(req: AuthRequest, res: Response, next: NextFunction){
+    try {
+        const userId = Number(req.user?.id);
+        const requested = Number(req.query.days ?? 30);
+        if (!Number.isInteger(requested) || requested < 1 || requested > 365) {
+            throw new BadRequestError('days must be a whole number between 1 and 365');
+        }
+
+        const response = await userService.getSignupsByDayService({ userId, days: requested });
+        res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Sign-ups by day fetched successfully',
+            data: response,
+            error: {}
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export default {
+    getSignupsByDay,
     getAllUsers,
     getSelfDetails,
     updateUserHandler,
