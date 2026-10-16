@@ -1,7 +1,7 @@
 import { json2csv } from 'json-2-csv';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 
-import { fetchWorkrDeliveries, isDeliveryLookupConfigured, NOTIFICATION_LOOKUP_MAX_USER_IDS } from '../apis/notificationDeliveries.api';
+import { fetchWorkrDeliveriesByUser, isDeliveryLookupConfigured } from '../apis/notificationDeliveries.api';
 import logger from '../configs/logger.config';
 import sequelize from '../db/models/sequelize';
 import User from '../db/models/user.model';
@@ -189,16 +189,7 @@ class UserService {
         }
 
         try {
-            const byUser = new Map<number, WorkrDelivery[]>(userIds.map((userId) => [userId, []]));
-
-            for (let start = 0; start < userIds.length; start += NOTIFICATION_LOOKUP_MAX_USER_IDS) {
-                const chunk = userIds.slice(start, start + NOTIFICATION_LOOKUP_MAX_USER_IDS);
-                for (const delivery of await fetchWorkrDeliveries(chunk)) {
-                    byUser.get(delivery.userId)?.push(delivery);
-                }
-            }
-
-            return byUser;
+            return await fetchWorkrDeliveriesByUser(userIds);
         } catch (error) {
             logger.error('Could not load the delivery results for the candidates list', {
                 message: error instanceof Error ? error.message : String(error)

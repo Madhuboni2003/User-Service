@@ -40,7 +40,7 @@ export function buildNurtureView(row: NurtureStatusRow | null, phoneNo: string, 
 
     for (const step of [...steps].filter((candidate) => candidate.enabled).sort((a, b) => a.day - b.day)) {
         // A channel that cannot be used for this person (WhatsApp without a valid number) is left out of the step.
-        const channels = step.channels.filter((channel) => channel !== NotificationChannel.WHATSAPP || hasPhone);
+        const channels = usableChannels(step, phoneNo);
         stepViews.push({ day: step.day, channels, state: stateOf(step.day, channels.length, row, lastSent), deliveries: [], delivery: null });
     }
 
@@ -55,6 +55,12 @@ export function buildNurtureView(row: NurtureStatusRow | null, phoneNo: string, 
         deliveryChecked: false,
         steps: stepViews
     };
+}
+
+/** The channels of a step that can reach this person: a WhatsApp channel needs a valid Indian mobile number. */
+export function usableChannels(step: NurtureStep, phoneNo: string): NotificationChannel[] {
+    const hasPhone = toE164Phone(phoneNo) !== null;
+    return step.channels.filter((channel) => channel !== NotificationChannel.WHATSAPP || hasPhone);
 }
 
 function stateOf(day: number, usableChannels: number, row: NurtureStatusRow, lastSent: number): NurtureStepState {
@@ -93,24 +99,37 @@ export function attachDeliveries(view: NurtureView, deliveries: readonly WorkrDe
             return step;
         }
 
-        const results: StepDelivery[] = step.channels.map((channel) => {
-            const record = deliveries.find((delivery) => delivery.step === step.day && delivery.channel === channel);
+        const results = deliveryResultsForStep(step.day, step.channels, deliveries);
 
-            if (!record) {
-                return { channel, status: 'queued', failedReason: null, at: null };
-            }
-            return {
-                channel,
-                status: record.sendStatus,
-                failedReason: record.sendStatus === 'failed' ? record.failedReason : null,
-                at: record.sendStatus === 'failed' ? record.failedAt : record.submittedAt
-            };
-        });
-
-        return { ...step, deliveries: results, delivery: worstOf(results.map((result) => result.status)) };
+        return { ...step, deliveries: results, delivery: worstDelivery(results) };
     });
 
     return { ...view, deliveryChecked: true, steps };
+}
+
+/**
+ * What the sending service reported for each channel of one step that was handed over. `deliveries` are the records of one
+ * person. A channel with no record yet is still queued.
+ */
+export function deliveryResultsForStep(day: number, channels: readonly NotificationChannel[], deliveries: readonly WorkrDelivery[]): StepDelivery[] {
+    return channels.map((channel): StepDelivery => {
+        const record = deliveries.find((delivery) => delivery.step === day && delivery.channel === channel);
+
+        if (!record) {
+            return { channel, status: 'queued', failedReason: null, at: null };
+        }
+        return {
+            channel,
+            status: record.sendStatus,
+            failedReason: record.sendStatus === 'failed' ? record.failedReason : null,
+            at: record.sendStatus === 'failed' ? record.failedAt : record.submittedAt
+        };
+    });
+}
+
+/** Worst result across the channels: failed, else still in progress, else sent. null when there are no channels. */
+export function worstDelivery(results: readonly StepDelivery[]): DeliveryStatus | null {
+    return worstOf(results.map((result) => result.status));
 }
 
 function worstOf(statuses: DeliveryStatus[]): DeliveryStatus | null {

@@ -9,6 +9,8 @@ import { updateUserProfileSchema, updateUserSchema } from '../../validators/user
 const userRouter = Router();
 
 userRouter.get('/pages', authenticationMiddleware, userController.getAllUsers);
+userRouter.get('/nurture-leads', authenticationMiddleware, userController.getNurtureLeads);
+userRouter.get('/nurture-leads/summary', authenticationMiddleware, userController.getNurtureLeadsSummary);
 userRouter.get('/signups/daily', authenticationMiddleware, userController.getSignupsByDay);
 userRouter.get('/all-candiates/csv', authenticationMiddleware, userController.getAllCandidatesCSV);
 userRouter.get('/', authenticationMiddleware, userController.getSelfDetails);

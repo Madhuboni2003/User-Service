@@ -1,15 +1,18 @@
 import { NextFunction, Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 
+import LeadNurtureRepository from '../repository/leadNurture.repository';
 import RoleRepository from '../repository/role.repository';
 import UserRepository from '../repository/user.repository';
 import UserProfileRepository from '../repository/userProfile.repository';
 import UserRoleRepository from '../repository/userRole.repository';
+import NurtureLeadsService from '../services/nurtureLeads.service';
 import UserService from '../services/user.service';
 import UserProfileService from '../services/userProfile.service';
 import { AuthRequest } from '../types/AuthRequest';
 import { BadRequestError } from '../utils/errors/app.error';
 import { isValidDayKey } from '../utils/helpers/istDay.helper';
+import { nurtureLeadsQuerySchema, nurtureLeadsSummaryQuerySchema } from '../validators/nurtureLeads.validator';
 
 const userRepository = new UserRepository();
 const userProfileRepository = new UserProfileRepository();
@@ -18,6 +21,7 @@ const roleRepository = new RoleRepository();
 
 const userService = new UserService(userRepository, userProfileRepository, roleRepository, userRoleRepository);
 const userProfileService = new UserProfileService(userProfileRepository);
+const nurtureLeadsService = new NurtureLeadsService(userRepository, new LeadNurtureRepository());
 
 async function getUsersByName(req: Request, res: Response, next: NextFunction){
     try{
@@ -225,7 +229,56 @@ async function getSignupsByDay(req: AuthRequest, res: Response, next: NextFuncti
     }
 }
 
+async function getNurtureLeads(req: AuthRequest, res: Response, next: NextFunction){
+    try {
+        const parsed = nurtureLeadsQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            throw new BadRequestError(parsed.error.issues.map((issue) => `${issue.path.join('.') || 'query'}: ${issue.message}`).join('; '));
+        }
+
+        const result = await nurtureLeadsService.listLeads(Number(req.user?.id), parsed.data);
+
+        if ('csv' in result) {
+            res.setHeader('Content-Type', 'text/csv')
+                .setHeader('Content-Disposition', `attachment; filename="nurture-day-${parsed.data.day}-leads.csv"`)
+                .status(StatusCodes.OK)
+                .send(result.csv);
+            return;
+        }
+
+        res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Nurture leads fetched successfully',
+            data: result,
+            error: {}
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function getNurtureLeadsSummary(req: AuthRequest, res: Response, next: NextFunction){
+    try {
+        const parsed = nurtureLeadsSummaryQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            throw new BadRequestError(parsed.error.issues.map((issue) => `${issue.path.join('.') || 'query'}: ${issue.message}`).join('; '));
+        }
+
+        const result = await nurtureLeadsService.summary(Number(req.user?.id), parsed.data.status);
+        res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Nurture summary fetched successfully',
+            data: result,
+            error: {}
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export default {
+    getNurtureLeadsSummary,
+    getNurtureLeads,
     getSignupsByDay,
     getAllUsers,
     getSelfDetails,

@@ -72,3 +72,20 @@ export async function fetchWorkrDeliveries(userIds: number[]): Promise<WorkrDeli
         clearTimeout(timer);
     }
 }
+
+/**
+ * Delivery records of many users, keyed by user id (every asked id is present, possibly with an empty list). Asks in chunks of
+ * NOTIFICATION_LOOKUP_MAX_USER_IDS and throws, like fetchWorkrDeliveries, if any chunk cannot be answered.
+ */
+export async function fetchWorkrDeliveriesByUser(userIds: number[]): Promise<Map<number, WorkrDelivery[]>> {
+    const byUser = new Map<number, WorkrDelivery[]>(userIds.map((userId) => [userId, []]));
+
+    for (let start = 0; start < userIds.length; start += NOTIFICATION_LOOKUP_MAX_USER_IDS) {
+        const chunk = userIds.slice(start, start + NOTIFICATION_LOOKUP_MAX_USER_IDS);
+        for (const delivery of await fetchWorkrDeliveries(chunk)) {
+            byUser.get(delivery.userId)?.push(delivery);
+        }
+    }
+
+    return byUser;
+}
