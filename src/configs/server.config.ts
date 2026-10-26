@@ -34,6 +34,18 @@ export const serverConfig: ServerConfig =  {
     JWT_EXPRIRES_IN : String(process.env.JWT_EXPRIRES_IN)
 };
 
+import crypto from 'crypto';
+
+// Temporary debugging only
+console.log('[JWT CONFIG]', {
+    secretLoaded: Boolean(serverConfig.JWT_SECRET),
+    secretLength: serverConfig.JWT_SECRET.length,
+    fingerprint: crypto
+        .createHash('sha256')
+        .update(serverConfig.JWT_SECRET)
+        .digest('hex')
+        .slice(0, 12),
+});
 export const dbConfig: DBConfig = {
     DB_HOST: process.env.DB_HOST || 'localhost',
     DB_USER: process.env.DB_USER || 'root',

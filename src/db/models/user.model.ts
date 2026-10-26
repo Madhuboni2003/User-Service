@@ -14,7 +14,7 @@ class User extends Model<InferAttributes<User>, InferCreationAttributes<User>> {
     declare email: string;
     declare password: string;
     declare phoneNo: string;
-    declare graduationYear: string;
+    declare graduationYear: CreationOptional<string | null>;
     declare createdAt: CreationOptional<Date>;
     declare updatedAt: CreationOptional<Date>;
     declare deletedAt: CreationOptional<Date | null>;

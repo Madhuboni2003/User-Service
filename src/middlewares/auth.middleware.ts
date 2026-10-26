@@ -25,9 +25,15 @@ const authenticationMiddleware = (req : AuthRequest, _res: Response, next: NextF
         throw new UnauthorizedError('No token provided');
     }
 
-    const decoded  = userService.isAuthenticated(authHeader);
-    req.user = decoded as UserTokenPayload;
-    next();
-};
+    const tokenMatch = authHeader.match(/^Bearer\s+(\S+)$/i);
+
+    if (!tokenMatch) {
+        throw new UnauthorizedError('Invalid authorization header');
+    }
+
+    const decoded = userService.isAuthenticated(tokenMatch[1]);
+        req.user = decoded as UserTokenPayload;
+        next();
+    };
 
 export default authenticationMiddleware;

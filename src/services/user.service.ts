@@ -180,7 +180,7 @@ class UserService {
             
         } catch (error) {
             if (error instanceof TokenExpiredError) {
-                return new UnauthorizedError('Session expired. Please login again.');
+                throw new UnauthorizedError('Session expired. Please login again.');
             } else if (error instanceof JsonWebTokenError) {
                 logger.error('Invalid token');
                 throw new UnauthorizedError('Invalid token');
