@@ -20,18 +20,28 @@ const userService = new UserService(userRepository, userProfileRepository, roleR
 
 const authenticationMiddleware = (req : AuthRequest, _res: Response, next: NextFunction)=>{
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    let token: string | undefined;
+
+    // Read token from Authorization header first.
+    if (authHeader) {
+        const tokenMatch = authHeader.match(/^Bearer\s+(\S+)$/i);
+
+        if (!tokenMatch) {
+            throw new UnauthorizedError('Invalid authorization header');
+        }
+
+        token = tokenMatch[1];
+    } else {
+        // Fall back to the accessToken cookie.
+        token = req.cookies?.accessToken;
+    }
+
+    if (!token) {
         logger.error('Authentication failed: No token provided');
         throw new UnauthorizedError('No token provided');
     }
 
-    const tokenMatch = authHeader.match(/^Bearer\s+(\S+)$/i);
-
-    if (!tokenMatch) {
-        throw new UnauthorizedError('Invalid authorization header');
-    }
-
-    const decoded = userService.isAuthenticated(tokenMatch[1]);
+    const decoded = userService.isAuthenticated(token);
         req.user = decoded as UserTokenPayload;
         next();
     };

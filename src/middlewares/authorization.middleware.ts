@@ -4,8 +4,9 @@ import { NextFunction, Response } from 'express';
 import UserRepository from '../repository/user.repository';
 import { AuthRequest } from '../types/AuthRequest';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors/app.error';
+import { Role } from '../constants/roles';
 
-type AdminPanelRole = 'admin' | 'manager';
+type AdminPanelRole = Role;
 
 const userRepository = new UserRepository();
 

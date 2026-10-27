@@ -2,6 +2,7 @@ import './db/models/associations';
 
 import cors from 'cors';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 
 import logger from './configs/logger.config';
 import { frontendConfig, serverConfig } from './configs/server.config';
@@ -21,6 +22,8 @@ app.use(cors({
 app.use(express.json());
 
 app.use(attachCorrelationIdMiddleware);
+
+app.use(cookieParser());
 
 app.use('/api', apiRouter);
 
