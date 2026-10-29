@@ -86,7 +86,7 @@ export function nextEnabledStepAfter(day: number, steps: readonly NurtureStep[] 
     return firstEnabledStepFrom(day + 1, steps);
 }
 
-/** Fails at startup, not at 11:00 on a send day, if an enabled step cannot be sent. */
+/** Fails at startup, not at 9:00 on a send day, if an enabled step cannot be sent. */
 export function assertStepCatalogue(steps: readonly NurtureStep[] = NURTURE_STEPS): void {
     const days = new Set<number>();
     for (const step of steps) {

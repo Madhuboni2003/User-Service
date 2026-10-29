@@ -56,18 +56,19 @@ class LeadNurtureService {
                 signedUpAt: (input.signedUpAt ?? new Date()).toISOString()
             };
 
+
             await enqueueLeadNurture(payload, `workr-readiness-check-${input.userId}`);
             await this.scheduleNurture(input.userId, input.signedUpAt ?? new Date());
-        } catch (error) {
-            logger.error('Lead nurture handling failed', {
-                userId: input.userId,
-                message: error instanceof Error ? error.message : String(error)
-            });
-        }
-    }
+                } catch (error) {
+                    logger.error('Lead nurture handling failed', {
+                        userId: input.userId,
+                        message: error instanceof Error ? error.message : String(error)
+                    });
+                }
+            }
 
     /**
-     * Puts the user into the Day 2..Day 15 nurture: one row saying the first step is due at 11:00 IST two days after signup.
+     * Puts the user into the Day 2..Day 15 nurture: one row saying the first step is due at 9:00 IST two days after signup.
      * The scheduler (crons/leadNurture.scheduler.ts) does the rest. Never throws; a failure here must not affect the Day 0 message.
      */
     private async scheduleNurture(userId: number, signedUpAt: Date): Promise<void> {
@@ -78,6 +79,7 @@ class LeadNurtureService {
             }
 
             const dueAt = dueAtForDay(signedUpAt, firstStep.day, leadNurtureSchedulerConfig.SEND_HOUR_IST);
+
             const created = await this.leadNurtureRepository.createForSignup(userId, signedUpAt, firstStep.day, dueAt);
             logger.info('Lead nurture scheduled', { userId, firstStep: firstStep.day, created });
         } catch (error) {

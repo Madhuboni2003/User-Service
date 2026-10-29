@@ -7,7 +7,7 @@ import { createLeadNurtureScheduler } from '../services/leadNurtureScheduler.ser
 
 let task: ScheduledTask | null = null;
 
-// Every `tickMinutes` minutes between startHour:00 and endHour-1:55, e.g. 15, 10, 19 gives every 15 minutes during hours 10 to 18 IST (the end hour is exclusive).
+// Every `tickMinutes` minutes between startHour:00 and endHour-1:55, e.g. 15, 9, 19 gives every 15 minutes during hours 9 to 18 IST (the end hour is exclusive).
 export const buildLeadNurtureCronExpression = (tickMinutes: number, startHour: number, endHour: number): string => {
     if (!Number.isInteger(tickMinutes) || tickMinutes < 1 || tickMinutes > 60 || 60 % tickMinutes !== 0) {
         throw new Error(`LEAD_NURTURE_TICK_MINUTES must divide 60, got ${tickMinutes}`);

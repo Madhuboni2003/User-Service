@@ -7,7 +7,7 @@ const istMidnightMs = (date: Date): number => Math.floor((date.getTime() + IST_O
 
 export const istHour = (date: Date): number => new Date(date.getTime() + IST_OFFSET_MS).getUTCHours();
 
-/** `sendHour`:00 IST, `day` calendar days (IST) after the day `signedUpAt` falls on. Day 2 after a Monday 23:50 signup is Wednesday 11:00. */
+/** `sendHour`:00 IST, `day` calendar days (IST) after the day `signedUpAt` falls on. Day 2 after a Monday 23:50 signup is Wednesday 9:00. */
 export const dueAtForDay = (signedUpAt: Date, day: number, sendHour: number): Date => {
     return new Date(istMidnightMs(signedUpAt) + day * DAY_MS + sendHour * HOUR_MS - IST_OFFSET_MS);
 };

@@ -124,9 +124,9 @@ export const leadNurtureSchedulerConfig: LeadNurtureSchedulerConfig = {
     // A claimed row that is never released (crash) becomes claimable again after this long.
     LOCK_MS: Number(process.env.LEAD_NURTURE_LOCK_MS) || 10 * 60 * 1000,
     // Messages go out between these hours IST, and each day's message is due at SEND_HOUR_IST.
-    WINDOW_START_HOUR_IST: Number(process.env.LEAD_NURTURE_WINDOW_START_HOUR_IST) || 10,
+    WINDOW_START_HOUR_IST: Number(process.env.LEAD_NURTURE_WINDOW_START_HOUR_IST) || 9,
     WINDOW_END_HOUR_IST: Number(process.env.LEAD_NURTURE_WINDOW_END_HOUR_IST) || 19,
-    SEND_HOUR_IST: Number(process.env.LEAD_NURTURE_SEND_HOUR_IST) || 11
+    SEND_HOUR_IST: Number(process.env.LEAD_NURTURE_SEND_HOUR_IST) || 9
 };
 
 // The VSL's candidate-form-details-service: asked which WorkR users have already registered there (POST /integrations/workr/engagement).
